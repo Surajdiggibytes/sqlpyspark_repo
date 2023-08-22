@@ -1,20 +1,49 @@
 import unittest
+from pyspark.sql.functions import col,expr
 from src.Assignment2 import util
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.getOrCreate()
 
-class MyTestCase(unittest.TestCase):
-    def test_something(self):
-        input_data = [('Banana', 1000, 'USA'), ('Carrots', 1500, 'INDIA'), ('Beans', 1600, 'Swedan'), ('Orange', 2000, 'UK'),
-                ('Orange', 2000, 'UAE'), ('Banana', 400, 'China'), ('Carrots', 1200, 'China')]
-        input_schema = ('Product', 'Amount', 'Country')
-        df = spark.createDataFrame(input_data, input_schema)
-        test_out = util.pivot_asgn(df)
+def test_pivot_fun(df):
+    pivotDF = df.groupBy("Product").pivot("Country").sum("Amount")
+    # pivotDF.show()
+    return pivotDF
 
-        output_data = [('Orange','UAE',2000),('Orange','UK',2000),('Beans','Swedan',1600),('Banana','China',400),('Carrots','China',1200),('Carrots','INDIA',1500)]
-        output_schema = ['Product','Country','Total']
-        output_df = spark.createDataFrame(output_data,output_schema)
-        self.assertEqual(output_df.collect(),test_out.collect())  # add assertion here
+def test_unpivoit_fun(pivotDF):
+    unpivotexp = "stack(5,'China',China,'INDIA',INDIA,'Swedan',Swedan,'UAE',UAE,'UK',UK) as (Country,Total)"
+
+    unPivotDF = pivotDF.select("Product", expr(unpivotexp)) \
+        .where("Total is not null")
+    # unPivotDF.show(truncate=False)
+    return unPivotDF
+
+
+data =  [('Rice', 2000, 'USA'),
+        ('Sugar', 1500, 'INDIA'),
+        ('Ragi', 1600, 'Swedan'),
+        ('Wheat', 2000, 'UK'),
+        ('Bajra',3000, 'UAE'),
+        ('Millets',9000, 'China'),
+        ('Jowar', 1900, 'China')]
+schema = ('Product', 'Amount', 'Country')
+df = spark.createDataFrame(data, schema)
+
+fun1 = test_pivot_fun(df)
+fun2 = test_unpivoit_fun(fun1)
+class MyTestCase(unittest.TestCase):
+    def test_case1(self):
+
+        actual_output  = util.pivot_fun(df)
+        expected_output = test_pivot_fun(df)
+        self.assertEqual(actual_output.collect(),expected_output.collect())
+
+    def test_case2(self):
+        actual_output = util.unpivoit_fun(fun1)
+        expected_output = test_unpivoit_fun(fun1)
+        self.assertEqual(actual_output.collect(), expected_output.collect())
+
+
+
 
 
 if __name__ == '__main__':
